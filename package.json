@@ -41,7 +41,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zws2005/douban-top250-crawler.git"
+    "url": "git+https://github.com/zws2005/zws-Agent.git"
   },
   "keywords": [
     "crawler",
@@ -54,7 +54,7 @@
   "author": "zws",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/zws2005/douban-top250-crawler/issues"
+    "url": "https://github.com/zws2005/zws-Agent/issues"
   },
-  "homepage": "https://github.com/zws2005/douban-top250-crawler#readme"
+  "homepage": "https://github.com/zws2005/zws-Agent#readme"
 }
