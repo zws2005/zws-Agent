@@ -8,6 +8,7 @@ export const doubanBooksSource: CrawlSource<RawBookRecord> = {
   name: "douban-books-top250",
   pageSize: DEFAULT_PAGE_SIZE,
   maxPages: 10,
+  defaultFileName: "raw_books.csv",
 
   buildPageUrl(pageIndex, pageSize = DEFAULT_PAGE_SIZE) {
     return buildTop250Url(pageIndex, pageSize);

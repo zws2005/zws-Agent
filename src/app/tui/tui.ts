@@ -1,5 +1,5 @@
 import readline from "node:readline";
-import type { AgentRunSummary, AnalysisSummary, AppRuntime } from "../runtime";
+import type { AnalysisSummary, AppRuntime } from "../runtime";
 
 const ANSI = {
   reset: "\x1b[0m",
@@ -19,24 +19,36 @@ const ANSI = {
 
 const HELP = [
   "/help              显示帮助",
+  "/crawl [网址]      抓取网页、商品评论、视频评论或电影评论",
+  "/crawl 网址 --pages 5  指定评论加载批次数",
+  "/sites             查看内置内容适配器",
   "/summary           查看数据摘要",
   "/search <关键词>   调用 web_search",
   "/trace             查看最新 trace 最近 20 行",
-  "/crawl             抓取 Top250",
   "/analyze           清洗、分析、刷新图表和看板",
-  "/pipeline          抓取 + 分析",
+  "/pipeline          抓取豆瓣 Top250 + 分析",
   "/session           显示最近一次 Agent 会话路径",
   "/clear             清空当前对话",
   "/quit              退出"
 ];
 
 const COMMANDS = new Set([
-  "/help", "/summary", "/search", "/trace", "/crawl", "/analyze",
+  "/help", "/crawl", "/sites", "/summary", "/search", "/trace", "/analyze",
   "/pipeline", "/session", "/clear", "/quit"
 ]);
 
 function line(width: number, char = "─"): string {
   return char.repeat(Math.max(10, width));
+}
+
+function extractUrl(value: string): string | undefined {
+  const embedded = value.match(/https?:\/\/[^\s<>"']+/i)?.[0];
+  const candidate =
+    embedded ??
+    (/^(?:www\.)?[a-z0-9][a-z0-9.-]*\.[a-z]{2,}(?::\d+)?(?:\/\S*)?$/i.test(value.trim())
+      ? value.trim()
+      : undefined);
+  return candidate?.replace(/[),.;!?，。；！？）】]+$/u, "");
 }
 
 export class Tui {
@@ -46,6 +58,7 @@ export class Tui {
   private status = "就绪";
   private busy = false;
   private closed = false;
+  private awaitingUrl = false;
   private providerLabel = "provider: auto";
   private sessionPath = "";
 
@@ -67,8 +80,9 @@ export class Tui {
 
     await this.refreshSummary();
     this.transcript.push(
-      "DOUBAN AGENT",
-      "输入任务开始对话；/help 查看命令；Esc 清空输入；Ctrl+C 退出。",
+      "zws-Agent",
+      "粘贴一个网址即可抓取；也可以输入自然语言任务或 /help 查看命令。",
+      "Esc 清空输入；Ctrl+C 退出。",
       ""
     );
     this.appendSummary();
@@ -76,8 +90,8 @@ export class Tui {
   }
 
   private printStaticHelp(): void {
-    console.log("DOUBAN AGENT");
-    console.log("请在真实终端中运行：npm run tui\n");
+    console.log("zws-Agent");
+    console.log("请在真实终端中运行：npm start\n");
     console.log(HELP.join("\n"));
   }
 
@@ -104,7 +118,7 @@ export class Tui {
     const rows = Math.max(24, process.stdout.rows ?? 40);
     const visible = Math.max(8, rows - 13);
     const out: string[] = [ANSI.clear];
-    out.push(`${ANSI.bold}${ANSI.blue}  DOUBAN AGENT${ANSI.reset}  ${ANSI.dim}${this.providerLabel} · ${this.status} · 待处理 ${this.busy ? 1 : 0}${ANSI.reset}`);
+    out.push(`${ANSI.bold}${ANSI.blue}  zws-Agent${ANSI.reset}  ${ANSI.dim}${this.providerLabel} · ${this.status} · 待处理 ${this.busy ? 1 : 0}${ANSI.reset}`);
     out.push(`${ANSI.dim}  /help 帮助 · Esc 清空输入 · Ctrl+C 取消或退出${ANSI.reset}`);
     out.push(line(width));
     for (const row of this.transcript.slice(-visible)) {
@@ -122,7 +136,9 @@ export class Tui {
     if (text.startsWith("✔")) return `${ANSI.green}${text}${ANSI.reset}`;
     if (text.startsWith("✖")) return `${ANSI.red}${text}${ANSI.reset}`;
     if (text.startsWith(">")) return `${ANSI.cyan}${text}${ANSI.reset}`;
-    if (text === "本轮完成") return `${ANSI.green}${text}${ANSI.reset}`;
+    if (text === "本轮完成" || text === "抓取完成") {
+      return `${ANSI.green}${text}${ANSI.reset}`;
+    }
     return text;
   }
 
@@ -162,11 +178,21 @@ export class Tui {
     if (!value) return;
     this.input = "";
     this.append(`> ${value}`);
+    if (this.awaitingUrl) {
+      this.awaitingUrl = false;
+      await this.runUrlCrawl(value);
+      return;
+    }
     if (value.startsWith("/")) {
       await this.runCommand(value);
-    } else {
-      await this.runAgent(value);
+      return;
     }
+    const url = extractUrl(value);
+    if (url) {
+      await this.runUrlCrawl(url);
+      return;
+    }
+    await this.runAgent(value);
   }
 
   private async runCommand(commandLine: string): Promise<void> {
@@ -189,7 +215,7 @@ export class Tui {
       return;
     }
     if (command === "/clear") {
-      this.transcript = ["DOUBAN AGENT", ""];
+      this.transcript = ["zws-Agent", ""];
       this.render();
       return;
     }
@@ -215,6 +241,21 @@ export class Tui {
       this.render();
       return;
     }
+    if (command === "/sites") {
+      this.append(
+        [
+          "内置来源:",
+          "  douban-books-top250  豆瓣读书 Top250 URL（结构化 CSV）",
+          "  douban-movie-comments 豆瓣电影短评（分页 JSON API）",
+          "  jd-product-comments  京东商品评论（Chromium + 评论接口响应）",
+          "  douyin-video-comments 抖音视频评论（Chromium + 登录状态）",
+          "  movie-review-page    Letterboxd / IMDb / Rotten Tomatoes / 豆瓣长评",
+          "  generic-web-page     任意标准 HTML 页面（元数据、正文、标题、链接和图片 JSON）",
+        ].join("\n")
+      );
+      this.render();
+      return;
+    }
     if (command === "/search") {
       if (!argument) {
         this.append("用法: /search <关键词>");
@@ -224,9 +265,55 @@ export class Tui {
       await this.runWebSearch(argument);
       return;
     }
-    if (["/crawl", "/analyze", "/pipeline"].includes(command!)) {
+    if (command === "/crawl") {
+      const url = extractUrl(argument);
+      const pagesMatch = argument.match(/--pages(?:=|\s+)(\d+)/);
+      const pages = pagesMatch ? Number(pagesMatch[1]) : undefined;
+      if (!argument) {
+        this.awaitingUrl = true;
+        this.status = "等待网址";
+        this.append("请粘贴要抓取的 HTTP/HTTPS 网址。");
+        this.render();
+      } else if (!url) {
+        this.append(`网址格式无效: ${argument}`);
+        this.render();
+      } else {
+        await this.runUrlCrawl(url, pages);
+      }
+      return;
+    }
+    if (["/analyze", "/pipeline"].includes(command!)) {
       await this.runScript(command!.slice(1));
       return;
+    }
+  }
+
+  private async runUrlCrawl(url: string, pages?: number): Promise<void> {
+    this.busy = true;
+    this.status = "正在抓取网址";
+    this.render();
+    try {
+      const result = await this.runtime.crawlUrl(url, (progress) => {
+        this.append(progress);
+        this.render();
+      }, { pages });
+      this.append("");
+      this.append(`来源: ${result.sourceName} (${result.kind})`);
+      if (result.title) this.append(`标题: ${result.title}`);
+      this.append(`记录数: ${result.rowCount}`);
+      this.append(`输出: ${result.outputPath}`);
+      if (result.preview) {
+        this.append("内容预览:");
+        this.append(result.preview);
+      }
+      this.append("抓取完成");
+      this.status = "已抓取 1 个网址";
+    } catch (error) {
+      this.append(`抓取失败: ${error instanceof Error ? error.message : String(error)}`);
+      this.status = "抓取失败";
+    } finally {
+      this.busy = false;
+      this.render();
     }
   }
 

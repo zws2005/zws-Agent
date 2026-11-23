@@ -1,36 +1,64 @@
-# 豆瓣读书 Top250 爬虫与数据分析
+# zws-Agent
 
-一个可复现的 **TypeScript 爬虫 + Python/pandas 清洗分析** 项目。爬虫抓取豆瓣读书 Top250 的书名、评分、评价人数、作者信息、出版社、出版日期、价格、简介、详情链接等字段，并输出原始数据与清洗分析结果。
+**可交互的多类型内容采集 Agent**。输入一个 HTTP/HTTPS 网址，`zws-Agent` 会自动识别普通网页、图书榜单、京东商品评论、抖音视频评论或电影评论，并输出结构化 JSON/CSV；也保留原项目的豆瓣读书 Top250 与 Python/pandas 分析能力。
+
+产品特点：
+
+- 交互式终端：启动后直接粘贴网址即可采集。
+- 一次任务抓取一个网址，输出独立文件，结果容易追溯。
+- 多内容类型：普通网页正文、豆瓣图书、京东商品评论、抖音视频评论、豆瓣电影短评和其他电影评论页。
+- 动态页面：京东与抖音通过 Playwright Core 驱动系统 Chromium，读取页面自身加载的评论响应。
+- 可扩展来源注册表：新增站点时实现一个 `CrawlSource<T>` 即可，不修改爬虫主循环。
+- Agent 可选：不需要 API Key 也能直接抓取；配置百炼或 DeepSeek 后可使用自然语言任务和 `crawl_url` 工具。
+- 原有数据分析和看板流程继续可用。
 
 ## 环境要求
 
 - Node.js >= 18.17（使用内置 `fetch`）
+- Chromium 或 Google Chrome（京东、抖音动态评论；普通网页和豆瓣评论不需要）
 - Python >= 3.10
 - pandas、matplotlib、jieba、wordcloud、snownlp、scikit-learn
 
 ## 快速开始
 
 ```bash
-cd 数据爬虫/douban-top250-crawler
+cd 数据爬虫/zws-Agent
 
-# 安装 TypeScript 依赖
 npm install
 
-# 单元与清洗测试（不访问网络）
+# 启动 zws-Agent 交互终端
+npm start
+
+# 或者直接抓取一个网址
+npm run crawl -- https://example.com/article
+
+# 京东商品评论
+npm run crawl -- https://item.jd.com/100012043978.html --pages 3
+
+# 抖音视频评论（建议配置 DOUYIN_COOKIE）
+npm run crawl -- https://www.douyin.com/video/<视频ID> --pages 3
+
+# 豆瓣电影短评
+npm run crawl -- https://movie.douban.com/subject/1292052/ --pages 5
+
+# Letterboxd / IMDb / Rotten Tomatoes 等评论页
+npm run crawl -- https://letterboxd.com/film/example/reviews/
+
+# 查看命令帮助
+npm run crawl -- --help
+
+# 不访问网络的完整测试
 npm run test:all
 
-# 真实网页 fetch 测试（访问第一页并验证解析结果）
+# 豆瓣真实网页 fetch 测试
 npm run fetch:test
-
-# 启动终端 UI（TUI）
-npm run tui
-
-# 抓取全部 10 页，共 250 条，默认页间隔 1.5 秒
-npm run crawl
 
 # 创建 Python 虚拟环境并安装分析依赖
 python3 -m venv --system-site-packages .venv
 python -m pip install -r requirements.txt
+
+# 兼容旧流程：抓取豆瓣 Top250 全部 10 页（共 250 条）
+npm run crawl:douban
 
 # 清洗数据、生成高级分析、图表和看板
 npm run analyze
@@ -63,40 +91,118 @@ npm run recommend -- 红楼梦 --top 5
 
 趋势数据保存在 `data/snapshots/`，每次运行 `npm run analyze` 会保存当天快照。只有持续多天运行后，趋势图才会形成真正的长期曲线。
 
-只抓取前两页、调整请求间隔或输出位置：
+直接抓取单个网址时，默认输出到 `data/pages/`。也可以指定文件：
 
 ```bash
-npm run crawl -- --pages 2 --delay-ms 2000
-npm run crawl -- --pages 10 --output data/raw_books.csv
-npm run crawl -- --help
+npm run crawl -- https://example.com/article --output data/pages/article.json
+npm run crawl -- https://book.douban.com/top250 --output data/pages/douban.csv
 ```
 
-## 终端 UI（TUI）
-
-执行：
+豆瓣批量模式仍支持页数、请求间隔和输出位置：
 
 ```bash
-npm run tui
+npm run crawl:douban -- --pages 2 --delay-ms 2000
+npm run crawl:douban -- --pages 10 --output data/raw_books.csv
+```
+
+## 单网址采集与多站点适配
+
+一次命令只处理一个网址。来源注册表根据 URL 选择适配器：
+
+| 来源 | 适用网址 | 输出 |
+| --- | --- | --- |
+| 豆瓣 Top250 专用适配器 | `book.douban.com/top250` | 结构化 CSV |
+| 京东商品评论 | `item.jd.com/<商品ID>.html`、`item.m.jd.com/product/<商品ID>.html` | 评论 CSV |
+| 抖音视频评论 | `douyin.com/video/<视频ID>`、`douyin.com/note/<ID>`、短链接 | 评论 CSV |
+| 豆瓣电影短评 | `movie.douban.com/subject/<电影ID>/` | 评论 CSV |
+| 第三方电影评论 | Letterboxd、IMDb、Rotten Tomatoes、豆瓣长评页 | 评论 CSV |
+| 通用网页适配器 | 任意返回标准 HTML 的 HTTP/HTTPS 网址 | JSON |
+| Wikipedia 页面配置 | `*.wikipedia.org` | 通用 JSON，优先提取正文内容 |
+| GitHub 页面配置 | `github.com` | 通用 JSON，优先提取 README/主内容 |
+
+通用 JSON 记录包括：
+
+- `url` / `finalUrl`：请求网址和重定向后的最终网址
+- `title` / `description` / `siteName`：页面标题、摘要和站点名
+- `author` / `publishedAt` / `language`：可用时提取的作者、发布时间和语言
+- `content`：去除导航、页脚、脚本、样式和表单后的可读正文
+- `headings`：正文标题层级
+- `links` / `images`：基于最终网址补全的链接和图片
+- `extractor` / `fetchedAt`：使用的提取器和抓取时间
+
+通用网页适配器不执行 JavaScript，也不绕过登录、验证码或访问控制。需要严格字段、分页或动态渲染时，应在 `src/sources/` 增加专用 `CrawlSource<T>`，底层 `crawlSource()` 无需改动。
+
+## 评论采集
+
+评论统一输出为 CSV，核心字段：
+
+- `source`：`jd-product`、`douyin-video`、`douban-movie` 或 `movie-review`
+- `item_id` / `item_url` / `item_title`：商品、视频或电影标识
+- `comment_id` / `author` / `content`
+- `rating` / `created_at` / `location`
+- `likes` / `reply_count` / `images`
+- `extra_json`：站点原始评论对象，便于后续深度分析
+- `fetched_at`：采集时间
+
+评论采集默认加载 3 批，每批大小受站点接口限制。可用 `--pages` 调整，最多由各适配器限制：
+
+```bash
+npm run crawl -- <网址> --pages 5 --delay-ms 2000 --output data/pages/comments.csv
+```
+
+### 京东与抖音登录态
+
+京东和抖音会根据访问频率、地区和登录状态触发风控。`zws-Agent` 不生成或破解站点签名，也不绕过验证码，只复用正常浏览器页面和用户自己的登录状态。
+
+```bash
+# 从已登录浏览器的请求头复制 Cookie
+export JD_COOKIE="pt_key=...; pt_pin=...;"
+export DOUYIN_COOKIE="sessionid=...; ..."
+
+# 或使用 Playwright storage state JSON
+export JD_STORAGE_STATE="/absolute/path/jd-storage-state.json"
+export DOUYIN_STORAGE_STATE="/absolute/path/douyin-storage-state.json"
+
+# 系统 Chromium 不在默认位置时
+export CHROMIUM_PATH="/usr/bin/chromium"
+```
+
+如果接口返回“活动太火爆”、登录页、验证码页或空评论列表，适配器会停止并提示配置登录状态，不会生成伪造结果。
+
+## 交互终端
+
+启动：
+
+```bash
+npm start
 ```
 
 TUI 采用聊天式交互：
 
-- 直接输入任务，使用 `.env` 中的模型执行 research Agent
+- 直接粘贴网址，立即执行单网址抓取，不需要模型 API Key
+- 输入自然语言任务时，使用 `.env` 中的模型执行 research Agent
+- `/crawl` 进入“等待网址”状态，下一条输入会被当作网址抓取
+- `/crawl <网址>` 直接抓取指定网址
+- `/sites` 查看内置来源适配器
 - 实时显示 `web_search` 等工具调用 trace
 - 显示最终回复、模型和 Session 路径
 - `/search <关键词>` 直接搜索
 - `/trace` 查看最新 trace 前 20 行
-- `/summary`、`/crawl`、`/analyze`、`/pipeline` 等斜杠命令
+- `/summary`、`/analyze`、`/pipeline` 等旧数据命令继续保留
 - `Esc` 清空输入，`Ctrl+C` 或 `/quit` 退出
 
 ```
-DOUBAN AGENT  bailian/qwen-plus · 就绪 · 待处理 0
+zws-Agent  bailian/qwen-plus · 就绪 · 待处理 0
 /help 帮助 · Esc 清空输入 · Ctrl+C 取消或退出
 ────────────────────────────────────────────
-● web_search {"query":"豆瓣读书 Top250"}
-✔ web_search 643 ms
-...
-本轮完成
+> https://example.com/article
+[crawl] page 1/1: https://example.com/article
+[crawl] parsed 1 rows
+[crawl] wrote 1 rows to data/pages/example.com-...json
+来源: generic-web-page (web-page)
+标题: 示例文章
+记录数: 1
+抓取完成
 ────────────────────────────────────────────
 > 
 session: data/agent-sessions/<id>.jsonl
@@ -145,7 +251,7 @@ npm run agent -- --preset research "搜索豆瓣读书 Top250 的现状并总结
 - `research`：在爬虫工具之外挂载 `web_search`
 
 ```bash
-npm run agent -- --preset crawler "抓取前两页并分析"
+npm run agent -- --preset crawler "抓取 https://example.com/article 并总结"
 npm run agent -- --preset research "搜索 Top250 最新信息"
 ```
 
@@ -162,28 +268,28 @@ npm run agent -- --preset research "搜索 Top250 最新信息"
 - 阿里云百炼 Provider：兼容 DashScope OpenAI Compatible API
 - DeepSeek Provider：兼容 DeepSeek Chat Completions API
 - `selectProvider()`：按环境变量或 `--provider` 自动选择模型
-- 默认工具：`fetch_top250_page`、`crawl_top250`、`read_books_csv`、`analyze_books`
+- 默认工具：`crawl_url`、`fetch_top250_page`、`crawl_top250`、`read_books_csv`、`analyze_books`
 - 研究 Preset 工具：`web_search`
 
-无 API Key 时运行离线演示（只抓取第一页，不修改数据）：
+无 API Key 时运行离线演示（只读取豆瓣第一页，不修改数据）：
 
 ```bash
 npm run agent:demo
 ```
 
-使用阿里云百炼模型运行：
+使用阿里云百炼模型运行自然语言任务：
 
 ```bash
 cp .env.example .env
 # 编辑 .env，填写 DASHSCOPE_API_KEY
-npm run agent -- "抓取豆瓣 Top250 前 2 页，保存原始数据并分析"
+npm run agent -- "抓取 https://example.com/article 并总结正文"
 ```
 
 也可以直接使用环境变量：
 
 ```bash
 export DASHSCOPE_API_KEY="你的百炼 API Key"
-npm run agent -- "抓取豆瓣 Top250 前 2 页，保存原始数据并分析"
+npm run agent -- "抓取 https://example.com/article 并总结正文"
 ```
 
 `.env` 已被 `.gitignore` 忽略，不会提交 API Key；`.env.example` 提供可提交的字段模板。
@@ -192,14 +298,14 @@ npm run agent -- "抓取豆瓣 Top250 前 2 页，保存原始数据并分析"
 
 ```bash
 export DASHSCOPE_MODEL="qwen-plus"
-npm run agent -- --provider bailian --model qwen-plus "抓取前两页并分析"
+npm run agent -- --provider bailian --model qwen-plus "抓取 https://example.com/article 并总结"
 ```
 
 继续使用 DeepSeek：
 
 ```bash
 export DEEPSEEK_API_KEY="你的 DeepSeek API Key"
-npm run agent -- --provider deepseek "抓取豆瓣 Top250 前 2 页并分析"
+npm run agent -- --provider deepseek "抓取 https://example.com/article 并总结"
 ```
 
 无 API Key 时自动使用 Demo Provider；也可以显式指定：
@@ -226,13 +332,14 @@ export DEEPSEEK_MODEL="deepseek-chat"
 - `docs/llm/deepseek.md`
 - `docs/llm/demo.md`
 - `docs/llm/session.md`
-- `docs/llm/scope.md`
-- `docs/llm/attachment.md`
 
 ## 输出文件
 
 | 文件 | 说明 |
 | --- | --- |
+| `data/pages/*.json` | 单网址通用网页采集结果 |
+| `data/pages/*.csv` | 单网址豆瓣 Top250 结构化结果 |
+| `data/pages/*comments*.csv` | 京东、抖音、豆瓣电影或其他电影评论 |
 | `data/raw_books.csv` | 原始抓取结果，保留评分和评价人数的网页原始文本 |
 | `data/clean_books.csv` | pandas 清洗后的结构化数据 |
 | `analysis/report.md` | 数据质量、总体统计、排名和分析结论 |
@@ -292,16 +399,20 @@ export DEEPSEEK_MODEL="deepseek-chat"
 npm run test:all
 ```
 
-- `npm test`：TypeScript 单元测试，覆盖页面解析、分页 URL、CSV 转义和空 HTML。
+- `npm test`：TypeScript 单元测试，覆盖通用网页提取、京东/抖音/豆瓣电影评论解析、电影评论 JSON-LD、URL 来源选择、CSV 输出和 Agent Core。
 - `npm run test:python`：pandas 端到端清洗测试，覆盖空标题、内容重复、重复书名、异常评分/人数、缺失排名和报告输出。
 - `npm run fetch:test`：独立的联网 smoke test，检查 HTTP 200、HTML 大小、解析条数和首条记录。
 
 ## 项目结构
 
 ```text
-数据爬虫/douban-top250-crawler/
+数据爬虫/zws-Agent/
 ├── src/
 │   ├── sources/          # CrawlSource 数据源适配器
+│   │   ├── jd-product-comments.ts
+│   │   ├── douyin-video-comments.ts
+│   │   ├── douban-movie-comments.ts
+│   │   └── movie-review-pages.ts
 │   ├── app/
 │   │   ├── config.ts      # 应用配置
 │   │   ├── presets.ts     # crawler / research Preset
@@ -312,24 +423,29 @@ npm run test:all
 │   │   ├── trace.ts       # 运行追踪
 │   │   └── tui/           # 终端 UI（TUI）
 │   ├── agent-cli.ts      # 爬虫 Agent 命令行入口
-│   ├── cli.ts            # 爬虫命令行入口
-│   ├── crawler.ts        # 分页抓取与原始 CSV 写出
+│   ├── cli.ts            # zws-Agent 命令行与交互启动入口
+│   ├── crawler.ts        # 通用抓取循环、单网址入口与文件写出
 │   ├── fetch.ts          # fetch 超时、重试与退避
-│   ├── parser.ts         # Cheerio 页面解析
+│   ├── parser.ts         # 豆瓣 Top250 页面解析
+│   ├── comment-types.ts  # 统一评论记录模型
+│   ├── comment-csv.ts    # 评论 CSV 输出
+│   ├── comments/         # 浏览器采集与通用评论工具
+│   ├── web-parser.ts     # 通用页面元数据与正文解析
+│   ├── web-page-types.ts # 通用网页记录模型
 │   ├── csv.ts            # CSV 序列化
 │   ├── normalize.ts      # 文本与 URL 工具
 │   ├── fetch-check.ts    # 联网 fetch 测试
 │   ├── types.ts
-│   ├── attachment/       # 附件类型
 │   └── core/             # DeepSeek Harness Core 最小适配层
 │       ├── agent/        # Agent 契约与 ToolRegistry
 │       ├── agent-loop/   # Agent 循环与爬虫工具
 │       ├── llm/          # DeepSeek / Demo Provider
 │       ├── plugins/
 │       │   └── providers/deepseek/ # 插件、Hook 与生命周期管理
-│       ├── scope/        # 作用域
 │       └── session/      # SessionLog 与事件日志
 ├── tests/
+│   ├── web-page.test.ts  # 通用网页与单网址抓取测试
+│   ├── comments.test.ts  # 评论适配器与评论输出测试
 │   ├── parser.test.ts
 │   └── harness.test.ts
 ├── analysis/
@@ -344,6 +460,7 @@ npm run test:all
 │   ├── index.html
 │   └── figures/
 ├── data/
+│   ├── pages/             # 单网址采集结果
 │   ├── raw_books.csv
 │   ├── clean_books.csv
 │   └── snapshots/         # 日期快照
@@ -354,7 +471,10 @@ npm run test:all
 
 ## 注意事项
 
-- 本项目用于课程学习和数据分析演示。抓取前请遵守目标网站的服务条款、robots.txt 和访问频率限制。
-- 默认每次请求间隔 1.5 秒，请勿提高频率或用于商业采集。
+- `zws-Agent` 用于课程学习和数据分析演示。抓取前请遵守目标网站的服务条款、robots.txt 和访问频率限制。
+- 单网址模式使用超时与重试；豆瓣批量模式默认每页间隔 1.5 秒。
 - 豆瓣页面结构可能变化；解析器测试和 `fetch:test` 可用于快速发现问题。
+- 通用网页适配器只处理服务端返回的 HTML，不执行 JavaScript，不处理需要登录或验证码的页面。
+- 京东与抖音评论需要 Chromium；登录态、地区、频率和站点策略都会影响可用性。
+- 评论采集仅用于合法、低频的数据研究，不应用于绕过访问控制、验证码或站点限制。
 - 原始数据中的 `rating_raw`、`rating_count_raw` 保留网页原文，清洗后的数值字段在 `data/clean_books.csv` 中。

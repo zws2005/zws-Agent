@@ -1,7 +1,7 @@
 {
   "generated_at": "2026-11-16T09:04:08.148823+00:00",
-  "input_file": "/home/hadoop/Downloads/数据爬虫/douban-top250-crawler/data/raw_books.csv",
-  "clean_file": "/home/hadoop/Downloads/数据爬虫/douban-top250-crawler/data/clean_books.csv",
+  "input_file": "/home/hadoop/Downloads/数据爬虫/zws-Agent/data/raw_books.csv",
+  "clean_file": "/home/hadoop/Downloads/数据爬虫/zws-Agent/data/clean_books.csv",
   "original_rows": 50,
   "clean_rows": 50,
   "missing_title_removed": 0,

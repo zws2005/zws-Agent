@@ -3,8 +3,6 @@ import { DeepSeekProvider } from "./deepseek";
 import { DemoCrawlerProvider } from "./demo";
 import type { LlmProvider } from "./types";
 
-export type ProviderName = "bailian" | "deepseek" | "demo";
-
 export interface SelectProviderOptions {
   provider?: string;
   model?: string;

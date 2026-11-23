@@ -3,13 +3,6 @@ import { DuckDuckGoSearchProvider } from "./duckduckgo";
 import { TavilySearchProvider } from "./tavily";
 import type { SearchOptions, SearchProvider, SearchResponse } from "./types";
 
-export type WebSearchProviderName = "bing" | "duckduckgo" | "tavily";
-
-export interface WebSearchServiceOptions {
-  provider?: SearchProvider;
-  env?: NodeJS.ProcessEnv;
-}
-
 export function createSearchProvider(env: NodeJS.ProcessEnv = process.env): SearchProvider {
   const forced = env.WEB_SEARCH_PROVIDER?.toLowerCase();
   if (forced === "duckduckgo" || forced === "ddg") return new DuckDuckGoSearchProvider();

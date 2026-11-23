@@ -69,7 +69,7 @@ const provider = new DeepSeekProvider({
 });
 
 const response = await provider.complete({
-  messages: [{ role: "user", content: "抓取 Top250 第一页" }],
+  messages: [{ role: "user", content: "抓取 https://example.com/article" }],
   tools: [],
   signal: new AbortController().signal
 });
@@ -93,7 +93,7 @@ DEEPSEEK_MODEL=deepseek-chat
 
 ```bash
 export DASHSCOPE_API_KEY="你的百炼 API Key"
-npm run agent -- "抓取豆瓣 Top250 前两页并分析"
+npm run agent -- "抓取 https://example.com/article 并总结"
 ```
 
 可选变量：
@@ -115,8 +115,8 @@ DASHSCOPE_MODEL=qwen-plus
 4. 否则使用 `demo`
 
 ```bash
-npm run agent -- --provider bailian --model qwen-plus "抓取前两页"
-npm run agent -- --provider deepseek "抓取前两页"
+npm run agent -- --provider bailian --model qwen-plus "抓取 https://example.com/article"
+npm run agent -- --provider deepseek "抓取 https://example.com/article"
 npm run agent -- --provider demo "抓取第一页"
 ```
 

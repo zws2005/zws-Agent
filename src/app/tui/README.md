@@ -1,15 +1,15 @@
 # src/app/tui
 
-这是项目的聊天式终端 UI（TUI）。
+这是 `zws-Agent` 的交互式终端 UI。
 
 ```bash
-npm run tui
+npm start
 ```
 
 界面结构：
 
 ```text
-DOUBAN AGENT  provider/model · 状态 · 待处理数
+zws-Agent  provider/model · 状态 · 待处理数
 /help 帮助 · Esc 清空输入 · Ctrl+C 取消或退出
 ────────────────────────────────────────────
 会话记录、工具 trace、Agent 回复
@@ -20,14 +20,18 @@ session: 最近一次 Agent JSONL 路径
 
 ## 输入方式
 
-- 直接输入任务：使用 `research` Preset 启动 Agent，模型从 `.env` 自动选择。
+- 直接粘贴网址：执行单网址抓取，不需要模型 API Key。
+- 支持普通网页、京东商品评论、抖音视频评论和电影评论；对应 URL 会自动选择适配器。
+- 直接输入自然语言任务：使用 `research` Preset 启动 Agent，模型从 `.env` 自动选择。
+- `/crawl [网址]`：抓取一个网址；不传网址时下一条输入会被作为网址。
+- `/crawl <网址> --pages 5`：指定评论加载批次数。
+- `/sites`：查看图书、评论和通用网页适配器。
 - `/help`：显示命令。
 - `/summary`：查看数据摘要。
 - `/search <关键词>`：直接调用 `web_search`。
 - `/trace`：查看最新 trace 文件最近 20 行。
-- `/crawl`：抓取 Top250。
 - `/analyze`：清洗、分析和刷新看板。
-- `/pipeline`：抓取 + 分析。
+- `/pipeline`：抓取豆瓣 Top250 + 分析。
 - `/session`：显示最近一次 Agent 会话路径。
 - `/clear`：清空当前会话记录。
 - `/quit` 或 `Ctrl+C`：退出。

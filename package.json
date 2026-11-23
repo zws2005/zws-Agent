@@ -1,16 +1,17 @@
 {
-  "name": "douban-top250-crawler",
-  "version": "1.0.0",
+  "name": "zws-agent",
+  "version": "1.1.0",
   "private": true,
-  "description": "豆瓣读书 Top250 TypeScript 爬虫与 pandas 数据清洗分析示例",
+  "description": "zws-Agent: 支持网页、京东评论、抖音评论和电影评论的可交互采集 Agent",
   "scripts": {
     "build": "npm run clean && tsc -p tsconfig.json",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "npm run build && node --test dist/tests/*.test.js",
     "fetch:test": "npm run build && node dist/src/fetch-check.js",
     "crawl": "npm run build && node dist/src/cli.js",
+    "crawl:douban": "npm run build && node dist/src/cli.js --douban",
     "analyze": "bash analysis/run_analysis.sh",
-    "pipeline": "npm run crawl && npm run analyze",
+    "pipeline": "npm run crawl:douban && npm run analyze",
     "test:python": "bash analysis/run_python.sh -m unittest discover -s tests -p 'test_*.py'",
     "test:all": "npm test && npm run test:python",
     "agent": "npm run build && node dist/src/agent-cli.js",
@@ -19,6 +20,7 @@
     "dashboard": "bash analysis/run_python.sh dashboard/generate_dashboard.py",
     "dashboard:serve": "bash analysis/run_python.sh -m http.server 8000 --directory dashboard",
     "tui": "npm run build && node dist/src/app/index.js",
+    "start": "npm run tui",
     "search": "npm run build && node dist/src/search-cli.js",
     "trace": "npm run build && node dist/src/trace-cli.js"
   },
@@ -26,13 +28,14 @@
     "node": ">=18.17"
   },
   "dependencies": {
-    "cheerio": "^1.0.0-rc.12"
+    "cheerio": "^1.0.0-rc.12",
+    "playwright-core": "^1.49.1"
   },
   "devDependencies": {
     "@types/node": "^18.19.130",
     "typescript": "^5.9.3"
   },
-  "main": "index.js",
+  "main": "dist/src/app/index.js",
   "directories": {
     "test": "tests"
   },
@@ -40,8 +43,15 @@
     "type": "git",
     "url": "git+https://github.com/zws2005/douban-top250-crawler.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "crawler",
+    "agent",
+    "typescript",
+    "web-scraping",
+    "comments",
+    "playwright"
+  ],
+  "author": "zws",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/zws2005/douban-top250-crawler/issues"

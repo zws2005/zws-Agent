@@ -1,4 +1,4 @@
-import type { ToolCall, ToolSchema } from "../llm/types";
+import type { ToolSchema } from "../llm/types";
 
 export interface ToolExecutionResult {
   callId: string;
@@ -18,10 +18,4 @@ export interface ToolDefinition extends ToolSchema {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<unknown> | unknown;
-}
-
-export interface AgentDescriptor {
-  id: string;
-  tools: readonly ToolSchema[];
-  lastToolCall?: ToolCall;
 }

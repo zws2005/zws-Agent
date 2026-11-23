@@ -10,8 +10,6 @@
 | [deepseek.md](deepseek.md) | DeepSeek Provider |
 | [demo.md](demo.md) | 离线 Demo Provider |
 | [session.md](session.md) | 会话事件日志 |
-| [scope.md](scope.md) | 作用域 |
-| [attachment.md](attachment.md) | 附件类型 |
 
 ## 完整最小示例
 

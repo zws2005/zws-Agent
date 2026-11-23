@@ -7,6 +7,7 @@ import { createCrawlerTools } from "../core/agent-loop/crawler-tools";
 import { selectProvider } from "../core/llm";
 import type { SessionRecord } from "../core/session/types";
 import { WebSearchService, type SearchResponse } from "../core/websearch";
+import { crawlUrl as crawlUrlTask, type UrlCrawlResult } from "../crawler";
 import { loadConfig, type AppConfig } from "./config";
 import { createAppPresetRegistry } from "./presets";
 import { TraceWriter } from "./trace";
@@ -161,6 +162,31 @@ export class AppRuntime {
       await this.trace.record("websearch/error", {
         query,
         durationMs,
+        message: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
+  }
+
+  async crawlUrl(
+    url: string,
+    onProgress?: (message: string) => void,
+    options: { pages?: number; pageSize?: number; delayMs?: number } = {}
+  ): Promise<UrlCrawlResult> {
+    await this.trace.record("crawl/start", { url, ...options });
+    try {
+      const result = await crawlUrlTask(url, { ...options, onProgress });
+      await this.trace.record("crawl/end", {
+        requestedUrl: result.requestedUrl,
+        finalUrl: result.finalUrl,
+        sourceName: result.sourceName,
+        outputPath: result.outputPath,
+        rowCount: result.rowCount
+      });
+      return result;
+    } catch (error) {
+      await this.trace.record("crawl/error", {
+        url,
         message: error instanceof Error ? error.message : String(error)
       });
       throw error;

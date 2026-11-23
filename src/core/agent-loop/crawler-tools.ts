@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { ToolRegistry } from "../agent";
-import { crawlSource } from "../../crawler";
+import { crawlSource, crawlUrl } from "../../crawler";
 import { fetchPage } from "../../fetch";
 import { doubanBooksSource } from "../../sources";
 
@@ -18,6 +18,46 @@ function numberArg(value: unknown, fallback: number, min: number, max: number): 
 
 export function createCrawlerTools(): ToolRegistry {
   const tools = new ToolRegistry();
+
+  tools.register({
+    name: "crawl_url",
+    description:
+      "抓取用户指定的一个 HTTP/HTTPS 网址，自动选择网页、京东评论、抖音评论或电影评论适配器，并写入 data/pages/。",
+    parameters: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "要抓取的一个完整 HTTP/HTTPS 网址"
+        },
+        pages: {
+          type: "integer",
+          minimum: 1,
+          maximum: 50,
+          description: "评论加载页数/批次数；普通网页通常为 1"
+        }
+      },
+      required: ["url"]
+    },
+    async execute(args, context) {
+      if (context.signal.aborted) throw new Error("cancelled");
+      const url = typeof args.url === "string" ? args.url.trim() : "";
+      if (!url) throw new Error("url is required");
+      const result = await crawlUrl(url, {
+        pages: numberArg(args.pages, 3, 1, 50)
+      });
+      return {
+        requestedUrl: result.requestedUrl,
+        finalUrl: result.finalUrl,
+        sourceName: result.sourceName,
+        kind: result.kind,
+        title: result.title,
+        rowCount: result.rowCount,
+        outputPath: path.relative(PROJECT_ROOT, result.outputPath),
+        preview: result.preview
+      };
+    }
+  });
 
   tools.register({
     name: "fetch_top250_page",

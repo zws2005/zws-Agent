@@ -1,11 +1,11 @@
-# TUI 模块说明
+# zws-Agent TUI 模块说明
 
 ## 1. 模块定位
 
 `src/app/tui` 实现聊天式终端 Agent 控制台。它负责：
 
 1. 显示项目摘要和对话记录。
-2. 接收用户任务和斜杠命令。
+2. 接收网址、自然语言任务和斜杠命令。
 3. 调用 `AppRuntime` 执行 Agent、Web Search 或项目脚本。
 4. 显示模型、工具 trace、最终回复和 Session 路径。
 
@@ -49,7 +49,7 @@ graph TD
 ## 4. 启动流程
 
 ```text
-npm run tui
+npm start
   → clean dist + tsc
   → node dist/src/app/index.js
   → loadEnvFile()
@@ -73,17 +73,19 @@ npm run tui
 
 ## 6. 输入与命令
 
-普通文本：使用 `research` Preset 启动 Agent。
+普通网址：直接调用单网址采集服务，并根据 ID/域名选择网页、商品评论、视频评论或电影评论适配器。普通文本：使用 `research` Preset 启动 Agent。
 
 | 命令 | 动作 |
 | --- | --- |
 | `/help` | 显示帮助 |
+| `/crawl [网址]` | 抓取一个网址；省略网址时等待下一次输入 |
+| `/crawl 网址 --pages N` | 指定评论加载批次数 |
+| `/sites` | 显示普通网页、图书和评论来源适配器 |
 | `/summary` | 刷新并显示数据摘要 |
 | `/search <关键词>` | 直接执行 Web Search |
 | `/trace` | 显示最新 trace 文件最近 20 行 |
-| `/crawl` | 执行 `npm run crawl` |
 | `/analyze` | 执行 `npm run analyze` |
-| `/pipeline` | 执行 `npm run pipeline` |
+| `/pipeline` | 抓取豆瓣 Top250 并分析 |
 | `/session` | 显示最近一次 Agent Session 路径 |
 | `/clear` | 清空会话记录 |
 | `/quit` | 退出 |
@@ -94,7 +96,13 @@ npm run tui
 
 ```text
 用户输入
-  → Tui.runAgent()
+  → 网址：Tui.runUrlCrawl()
+  → AppRuntime.crawlUrl()
+  → 来源注册表选择适配器
+  → 抓取一个网址并写入 data/pages/
+
+用户输入
+  → 自然语言：Tui.runAgent()
   → AppRuntime.runAgent()
   → selectProvider() 读取 .env 或环境变量
   → getAppPresetRegistry().get("research")
